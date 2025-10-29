@@ -1,0 +1,7 @@
+fastapi==0.101.0
+uvicorn[standard]==0.23.2
+httpx==0.24.1
+python-dotenv==1.0.1
+python-multipart==0.0.6
+google-api-python-client==2.99.0      # only if you use Google Drive extraction (optional)
+google-auth-httplib2==0.1.0           # optional
