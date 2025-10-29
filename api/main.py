@@ -13,14 +13,20 @@ if not DEEPSEEK_API_KEY:
     print("Warning: DEEPSEEK_API_KEY not set. Set it in .env")
 
 app = FastAPI(title="DeepSeek Learning Bot")
+frontend_url = "https://testurself-frontend.vercel.app/"
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=[
+        frontend_url,
+        "http://localhost:3000",
+        "http://127.0.0.1:3000"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # Store your document content here
 DOCUMENT_CONTENT = """
