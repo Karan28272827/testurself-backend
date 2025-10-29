@@ -17,6 +17,7 @@ frontend_url = "https://testurself-frontend.vercel.app/"
 
 app.add_middleware(
     CORSMiddleware,
+    allow_origin_regex=r"https://testurself-frontend.*\.vercel\.app",
     allow_origins=[
         frontend_url,
         "http://localhost:3000",
