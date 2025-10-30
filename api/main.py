@@ -169,7 +169,6 @@ class EvaluateRequest(BaseModel):
     question: str
     user_answer: str
 
-# In-memory cache with timestamp for questions
 doc_cache = {
     "content": None,
     "questions": None,
@@ -206,12 +205,12 @@ async def call_deepseek(prompt: str, temperature: float = 0.7) -> str:
 @app.get("/generate-from-doc")
 async def generate_from_doc(doc_url: str = Query(..., description="Google Doc published-to-web URL (e.g. .../pub or .../pub?output=txt)")):
     now = time.time()
-
-    cache_valid = (doc_cache["doc_url"] == doc_url and
-                   doc_cache["content"] is not None and
-                   doc_cache["questions"] is not None and
-                   now - doc_cache["last_update"] < 120)
-
+    cache_valid = (
+        doc_cache["doc_url"] == doc_url
+        and doc_cache["content"] is not None
+        and doc_cache["questions"] is not None
+        and now - doc_cache["last_update"] < 120
+    )
     if cache_valid:
         print("Using cached document and questions")
         return {"generated_questions": doc_cache["questions"]}
@@ -225,7 +224,9 @@ async def generate_from_doc(doc_url: str = Query(..., description="Google Doc pu
         doc_text = resp.text
 
     prompt = f"""
-Read the following document and generate exactly 5 objective questions with answers followed by 5 subjective questions with answers.
+Read the following document and generate exactly 5 objective questions with answers, then 5 subjective questions with answers.
+
+Each time you are called, vary the specific aspects, focus, and the phrasing being asked. Never repeat previous wording. Randomize question order, structure, and topics.
 
 Format exactly:
 
@@ -257,7 +258,7 @@ Document:
 {doc_text}
 """
 
-    questions = await call_deepseek(prompt, temperature=0.8)
+    questions = await call_deepseek(prompt, temperature=0.95)
 
     doc_cache["doc_url"] = doc_url
     doc_cache["content"] = doc_text
@@ -271,7 +272,7 @@ async def generate_question():
     default_doc = """
     The Python programming language was created by Guido van Rossum and first released in 1991.
     """
-    prompt = f"""Based on the following document, generate ONE specific question that tests understanding of the content.
+    prompt = f"""Based on the following document, generate ONE specific, never-before-used question that tests understanding of the content. Vary aspect, topic, and phrasing every call.
 The question should be clear, specific, and answerable from the document.
 Only return the question itself, nothing else.
 
@@ -279,7 +280,7 @@ Document:
 {default_doc}
 
 Question:"""
-    question = await call_deepseek(prompt, temperature=0.8)
+    question = await call_deepseek(prompt, temperature=0.9)
     return {"question": question.strip()}
 
 @app.post("/evaluate-answer")
@@ -294,17 +295,19 @@ Student's Answer: {payload.user_answer}
 Evaluate if the student's answer is correct based on the document content.
 
 - Ignore punctuation and capitalization differences.
-- Accept synonyms and minor paraphrasing if the meaning is still correct, and do not be overly strict on exact wording.
-- Be flexible on word order and minor grammatical differences as long as the core information is accurate.
-- Do not penalize for minor typos or small irrelevant mistakes.
+- Accept synonyms and minor paraphrasing, and do not be strict on exact wording.
+- Accept all minor spelling and grammar mistakes.
+- Be generous!
+- Only grade as INCORRECT if the user's answer is actually factually wrong or misses core meaning.
+- If the student's answer *communicates the same idea*, mark as CORRECT—even if the phrasing is different, uses synonyms, or omits obvious implied context.
+- Do not penalize for word order changes, English language variations, or short vs. long answer format.
 
 Respond in this exact format:
-
 
 VERDICT: [CORRECT or INCORRECT]
 JUSTIFICATION: [Explain why the answer is correct or incorrect. If incorrect, provide the correct answer and explain what was wrong with the student's response. If correct, explain what made it a good answer.]
 """
-    response = await call_deepseek(prompt, temperature=0.3)
+    response = await call_deepseek(prompt, temperature=0.2)
     lines = response.strip().split('\n')
     verdict_line = ""
     justification = ""
