@@ -294,7 +294,7 @@ Student's Answer: {payload.user_answer}
 
 Evaluate if the student's answer is correct based on the document content.
 
-- Ignore punctuation and capitalization differences.
+- Ignore punctuation and don't penalize based on case sensitivity differences.
 - Accept synonyms and minor paraphrasing, and do not be strict on exact wording.
 - Accept all minor spelling and grammar mistakes.
 - Be generous!
