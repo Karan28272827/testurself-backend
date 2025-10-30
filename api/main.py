@@ -135,6 +135,7 @@
 #     return {"message": "DeepSeek Learning Bot API"}
 
 
+import time
 import os
 from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel
@@ -168,11 +169,12 @@ class EvaluateRequest(BaseModel):
     question: str
     user_answer: str
 
-# Simple in-memory cache for document content and generated questions
+# In-memory cache with timestamp for questions
 doc_cache = {
     "content": None,
     "questions": None,
     "doc_url": None,
+    "last_update": 0,
 }
 
 async def call_deepseek(prompt: str, temperature: float = 0.7) -> str:
@@ -202,15 +204,18 @@ async def call_deepseek(prompt: str, temperature: float = 0.7) -> str:
         raise HTTPException(status_code=500, detail="Invalid response from DeepSeek")
 
 @app.get("/generate-from-doc")
-async def generate_from_doc(
-    doc_url: str = Query(..., description="Google Doc published-to-web URL (e.g. .../pub or .../pub?output=txt)")
-):
-    # Use cached content and questions if doc_url matches and cache present
-    if doc_cache["doc_url"] == doc_url and doc_cache["content"] and doc_cache["questions"]:
+async def generate_from_doc(doc_url: str = Query(..., description="Google Doc published-to-web URL (e.g. .../pub or .../pub?output=txt)")):
+    now = time.time()
+
+    cache_valid = (doc_cache["doc_url"] == doc_url and
+                   doc_cache["content"] is not None and
+                   doc_cache["questions"] is not None and
+                   now - doc_cache["last_update"] < 120)
+
+    if cache_valid:
         print("Using cached document and questions")
         return {"generated_questions": doc_cache["questions"]}
 
-    # Fetch content from Google Doc published-to-web URL
     async with httpx.AsyncClient() as client:
         resp = await client.get(doc_url)
         print(f"Doc fetch status: {resp.status_code}")
@@ -219,7 +224,6 @@ async def generate_from_doc(
             raise HTTPException(status_code=400, detail="Unable to fetch doc content.")
         doc_text = resp.text
 
-    # Compose prompt and call DeepSeek for questions
     prompt = f"""
 Read the following document and generate exactly 5 objective questions with answers followed by 5 subjective questions with answers.
 
@@ -252,17 +256,15 @@ Answer: ...
 Document:
 {doc_text}
 """
+
     questions = await call_deepseek(prompt, temperature=0.8)
 
-    # Cache the document and questions
     doc_cache["doc_url"] = doc_url
     doc_cache["content"] = doc_text
     doc_cache["questions"] = questions.strip()
+    doc_cache["last_update"] = now
 
     return {"generated_questions": questions.strip()}
-
-# ... rest of your code unchanged (generate_question, evaluate_answer, root) ...
-
 
 @app.post("/generate-question")
 async def generate_question():
@@ -290,6 +292,12 @@ Document:
 Student's Answer: {payload.user_answer}
 
 Evaluate if the student's answer is correct based on the document content.
+
+- Ignore punctuation and capitalization differences.
+- Accept synonyms and minor paraphrasing if the meaning is still correct, and do not be overly strict on exact wording.
+- Be flexible on word order and minor grammatical differences as long as the core information is accurate.
+- Do not penalize for minor typos or small irrelevant mistakes.
+
 Respond in this exact format:
 
 VERDICT: [CORRECT or INCORRECT]
