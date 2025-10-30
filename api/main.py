@@ -294,6 +294,8 @@ Student's Answer: {payload.user_answer}
 
 Evaluate if the student's answer is correct based on the document content.
 
+- Accept answers that are short, such as one or two words or a short phrase, if they communicate the expected meaning.
+- Do NOT require full sentences or extra explanation if the core information is present.
 - Ignore punctuation and don't penalize based on case sensitivity differences.
 - Accept synonyms and minor paraphrasing, and do not be strict on exact wording.
 - Accept all minor spelling and grammar mistakes.
